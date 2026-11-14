@@ -28,6 +28,8 @@ la app lo detecta y lo usa automáticamente.
 - Uso de RAM y swap.
 - **Colores adaptados al tema activo** de Cinnamon/GTK (acento, texto del panel,
   aviso y error).
+- **Configuración integrada**: intervalo, umbrales, etiquetas, colores, swap,
+  cierre a bandeja y arranque automático.
 - Modo CLI y salida JSON.
 - Sin `sudo` para leer los sensores y sin demonios.
 
@@ -37,12 +39,14 @@ la app lo detecta y lo usa automáticamente.
 
 ![Icono en el panel](https://raw.githubusercontent.com/shary-hh/gpumonitor/main/docs/panel.png)
 
+![Configuración de GPUMonitor](https://raw.githubusercontent.com/shary-hh/gpumonitor/main/docs/settings.png)
+
 ## Instalación
 
 ### Paquete .deb (recomendado)
 
 ```bash
-sudo apt install ./gpumonitor_1.0.1_all.deb
+sudo apt install ./gpumonitor_1.1.0_all.deb
 ```
 
 Dependencias: `python3-gi`, `gir1.2-gtk-3.0`, `python3-cairo` y
@@ -51,8 +55,8 @@ Dependencias: `python3-gi`, `gir1.2-gtk-3.0`, `python3-cairo` y
 ### Desde el código, solo para tu usuario
 
 ```bash
-tar xzf gpumonitor-1.0.1.tar.gz
-cd gpumonitor-1.0.1
+tar xzf gpumonitor-1.1.0.tar.gz
+cd gpumonitor-1.1.0
 ./install.sh                # lanzador y comando gpumonitor
 ./install.sh --autostart    # además arranca al iniciar sesión
 ./install.sh --uninstall    # desinstalar
@@ -62,10 +66,14 @@ cd gpumonitor-1.0.1
 
 ```bash
 gpumonitor                 # ventana + bandeja
+gpumonitor --settings      # ventana + configuración
 gpumonitor --cli           # terminal en vivo
 gpumonitor --cli --once    # una lectura
 gpumonitor --json          # JSON para scripts
 ```
+
+La configuración también se abre con el engranaje de la ventana o desde
+**Configuración…** en el menú de la bandeja.
 
 Si el icono del panel te parece pequeño, puedes subir la zona derecha de
 Cinnamon:

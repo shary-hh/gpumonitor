@@ -31,6 +31,8 @@ sensor, the app detects and uses it automatically.
 - RAM and swap usage.
 - **Colors follow the active Cinnamon/GTK theme** (accent, panel text, warning
   and error colors).
+- **Built-in settings**: interval, thresholds, labels, colors, swap,
+  close-to-tray and autostart.
 - CLI mode and JSON output.
 - No `sudo` needed to read sensors, no daemons.
 
@@ -40,12 +42,14 @@ sensor, the app detects and uses it automatically.
 
 ![Panel icon](https://raw.githubusercontent.com/shary-hh/gpumonitor/main/docs/panel.png)
 
+![GPUMonitor settings](https://raw.githubusercontent.com/shary-hh/gpumonitor/main/docs/settings.png)
+
 ## Installation
 
 ### .deb package (recommended)
 
 ```bash
-sudo apt install ./gpumonitor_1.0.1_all.deb
+sudo apt install ./gpumonitor_1.1.0_all.deb
 ```
 
 Dependencies: `python3-gi`, `gir1.2-gtk-3.0`, `python3-cairo` and
@@ -54,8 +58,8 @@ Dependencies: `python3-gi`, `gir1.2-gtk-3.0`, `python3-cairo` and
 ### From source, current user only
 
 ```bash
-tar xzf gpumonitor-1.0.1.tar.gz
-cd gpumonitor-1.0.1
+tar xzf gpumonitor-1.1.0.tar.gz
+cd gpumonitor-1.1.0
 ./install.sh                # launcher and `gpumonitor` command
 ./install.sh --autostart    # also start at login
 ./install.sh --uninstall    # uninstall
@@ -65,10 +69,14 @@ cd gpumonitor-1.0.1
 
 ```bash
 gpumonitor                 # window + tray
+gpumonitor --settings      # window + settings
 gpumonitor --cli           # live terminal output
 gpumonitor --cli --once    # single reading
 gpumonitor --json          # JSON for scripts
 ```
+
+Settings also open from the gear button in the window or from **Configuración…**
+in the tray menu.
 
 If the panel icon looks too small, you can enlarge Cinnamon's right zone:
 

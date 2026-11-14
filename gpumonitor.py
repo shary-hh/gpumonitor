@@ -5,10 +5,12 @@ GPUMonitor - miniaplicación para vigilar la iGPU Intel UHD Graphics 630.
 
 Qué hace
 --------
-* Muestra la temperatura de la GPU cada 1,5 s en una ventana GTK3 y en la
-  bandeja del sistema (AppIndicator).
+* Muestra la temperatura de la GPU en una ventana GTK3 y en la bandeja del
+  sistema (AppIndicator), con intervalo configurable.
 * Muestra también frecuencia real, actividad (residencia RC6), temperaturas
   de contexto (paquete de CPU y chipset PCH) y memoria RAM usada.
+* Configuración persistente: intervalo, umbrales, etiquetas, colores del tema,
+  swap, cierre a bandeja y arranque automático.
 * Los colores del icono se leen del tema activo de Cinnamon/GTK (acento, texto
   del panel y avisos), así que se adaptan al cambiar de tema.
 * Detecta automáticamente un sensor térmico real de la GPU si el kernel lo
@@ -26,6 +28,7 @@ Uso
 ---
     ./gpumonitor.py              # ventana + bandeja
     ./gpumonitor.py --no-tray    # solo ventana
+    ./gpumonitor.py --settings   # ventana + configuración
     ./gpumonitor.py --cli        # texto en terminal, refresco continuo
     ./gpumonitor.py --cli --once # una sola lectura
     ./gpumonitor.py --json       # una lectura en JSON (para scripts)
@@ -43,7 +46,7 @@ import time
 
 APP_NAME = "GPUMonitor"
 APP_ID = "gpumonitor"
-VERSION = "1.0.1"
+VERSION = "1.1.0"
 REFRESH_MS = 1500
 
 
@@ -244,6 +247,133 @@ def icon_path():
 
 
 # --------------------------------------------------------------------------
+# Configuración persistente
+# --------------------------------------------------------------------------
+CONFIG_DIR = os.path.join(
+    os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"),
+    "gpumonitor",
+)
+CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
+AUTOSTART_PATH = os.path.join(
+    os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"),
+    "autostart",
+    "gpumonitor.desktop",
+)
+
+DEFAULT_CONFIG = {
+    "refresh_seconds": 1.5,
+    "temp_warn": 60,
+    "temp_hot": 80,
+    "ram_warn": 75,
+    "ram_hot": 90,
+    "use_theme_colors": True,
+    "show_labels": True,
+    "show_swap": True,
+    "hide_on_close": True,
+}
+
+
+def _cfg_bool(value, default):
+    return value if isinstance(value, bool) else default
+
+
+def _cfg_number(value, default, low, high, cast=float):
+    try:
+        number = cast(value)
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(high, number))
+
+
+def _normalize_config(raw):
+    cfg = dict(DEFAULT_CONFIG)
+    if not isinstance(raw, dict):
+        return cfg
+    cfg["refresh_seconds"] = round(
+        _cfg_number(
+            raw.get("refresh_seconds"),
+            DEFAULT_CONFIG["refresh_seconds"],
+            0.5,
+            10.0,
+        ),
+        1,
+    )
+    cfg["temp_warn"] = int(
+        _cfg_number(raw.get("temp_warn"), DEFAULT_CONFIG["temp_warn"], 30, 100, int)
+    )
+    cfg["temp_hot"] = int(
+        _cfg_number(raw.get("temp_hot"), DEFAULT_CONFIG["temp_hot"], 31, 110, int)
+    )
+    cfg["ram_warn"] = int(
+        _cfg_number(raw.get("ram_warn"), DEFAULT_CONFIG["ram_warn"], 50, 100, int)
+    )
+    cfg["ram_hot"] = int(
+        _cfg_number(raw.get("ram_hot"), DEFAULT_CONFIG["ram_hot"], 51, 100, int)
+    )
+    if cfg["temp_hot"] <= cfg["temp_warn"]:
+        cfg["temp_hot"] = min(110, cfg["temp_warn"] + 1)
+    if cfg["ram_hot"] <= cfg["ram_warn"]:
+        cfg["ram_hot"] = min(100, cfg["ram_warn"] + 1)
+    for key in ("use_theme_colors", "show_labels", "show_swap", "hide_on_close"):
+        cfg[key] = _cfg_bool(raw.get(key), DEFAULT_CONFIG[key])
+    return cfg
+
+
+def load_config():
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
+            return _normalize_config(json.load(fh))
+    except (OSError, ValueError, TypeError):
+        return dict(DEFAULT_CONFIG)
+
+
+def save_config(config):
+    try:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        tmp = CONFIG_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(_normalize_config(config), fh, indent=2, ensure_ascii=False)
+        os.replace(tmp, CONFIG_PATH)
+    except OSError as exc:
+        print(f"No se pudo guardar la configuración: {exc}", file=sys.stderr)
+
+
+def autostart_enabled():
+    return os.path.exists(AUTOSTART_PATH)
+
+
+def _desktop_quote(value):
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def set_autostart(enabled):
+    if not enabled:
+        try:
+            os.remove(AUTOSTART_PATH)
+        except FileNotFoundError:
+            pass
+        return
+
+    os.makedirs(os.path.dirname(AUTOSTART_PATH), exist_ok=True)
+    python = sys.executable or "/usr/bin/python3"
+    script = os.path.abspath(__file__)
+    icon = icon_path() or "gpumonitor"
+    content = (
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=GPUMonitor\n"
+        "Comment=Monitor de temperatura de la iGPU Intel UHD Graphics 630\n"
+        f"Exec={_desktop_quote(python)} {_desktop_quote(script)}\n"
+        f"Icon={icon}\n"
+        "Terminal=false\n"
+        "X-GNOME-Autostart-enabled=true\n"
+        "X-GNOME-Autostart-Delay=5\n"
+    )
+    with open(AUTOSTART_PATH, "w", encoding="utf-8") as fh:
+        fh.write(content)
+
+
+# --------------------------------------------------------------------------
 # Lector de sensores
 # --------------------------------------------------------------------------
 class GpuReader:
@@ -419,7 +549,9 @@ def run_json(reader):
 # Interfaz GTK
 # --------------------------------------------------------------------------
 CSS = b"""
-window { background-color: #16161b; }
+.main-window { background-color: #16161b; }
+.gear-button { color: #e5e7eb; }
+.gear-button:hover { background-color: #2a2a33; border-radius: 4px; }
 .header-title { color: #e5e7eb; font-weight: bold; font-size: 14px; }
 .header-sub { color: #8b8b97; font-size: 11px; }
 .big-temp { font-weight: 800; }
@@ -438,13 +570,13 @@ COLOR_NA = "#9ca3af"
 COLOR_RAM = "#60a5fa"
 
 
-def _color_for(temp, palette=None):
+def _color_for(temp, palette=None, warn=60, hot=80):
     palette = palette or DEFAULT_PALETTE
     if temp is None:
         return palette["fg"], "Sin datos"
-    if temp >= 80.0:
+    if temp >= hot:
         return palette["error"], "Caliente"
-    if temp >= 60.0:
+    if temp >= warn:
         return palette["warning"], "Templado"
     return palette["accent"], "Normal"
 
@@ -619,7 +751,8 @@ def load_theme_palette():
     return palette
 
 
-def make_tray_icon(path, temp, color, ram_percent=None, ram_color=None, palette=None):
+def make_tray_icon(path, temp, color, ram_percent=None, ram_color=None, palette=None,
+                   show_labels=True):
     """
     Dibuja temperatura y (opcionalmente) RAM dentro del icono de bandeja.
 
@@ -627,6 +760,9 @@ def make_tray_icon(path, temp, color, ram_percent=None, ram_color=None, palette=
     RAM, texto del panel para las etiquetas y aviso/error para los estados
     altos. El fondo es una tarjeta translúcida derivada del color de texto,
     para integrarse en paneles claros u oscuros.
+
+    Con `show_labels=False` el icono se compacta: mantiene los números grandes
+    pero ocupa menos ancho en el panel.
     """
     import cairo
     import gi
@@ -640,7 +776,8 @@ def make_tray_icon(path, temp, color, ram_percent=None, ram_color=None, palette=
     fg_rgb = _rgb(palette["fg"])
     label_rgb = fg_rgb
     has_ram = ram_percent is not None
-    width = 288 if has_ram else 64
+    compact = has_ram and not show_labels
+    width = 180 if compact else (288 if has_ram else 64)
     height = 64
 
     surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
@@ -670,16 +807,25 @@ def make_tray_icon(path, temp, color, ram_percent=None, ram_color=None, palette=
 
     # barras inferiores de estado (finas, para no quitar altura al texto)
     if has_ram:
-        _rounded_rect(cr, 8, height - 5, 118, 2.5, 1.25)
-        cr.set_source_rgba(*temp_rgb, 0.95)
-        cr.fill()
-        _rounded_rect(cr, 142, height - 5, 130, 2.5, 1.25)
-        cr.set_source_rgba(*ram_rgb, 0.95)
-        cr.fill()
+        if compact:
+            _rounded_rect(cr, 8, height - 5, 74, 2.5, 1.25)
+            cr.set_source_rgba(*temp_rgb, 0.95)
+            cr.fill()
+            _rounded_rect(cr, 98, height - 5, 70, 2.5, 1.25)
+            cr.set_source_rgba(*ram_rgb, 0.95)
+            cr.fill()
+            divider_x = 90
+        else:
+            _rounded_rect(cr, 8, height - 5, 118, 2.5, 1.25)
+            cr.set_source_rgba(*temp_rgb, 0.95)
+            cr.fill()
+            _rounded_rect(cr, 142, height - 5, 130, 2.5, 1.25)
+            cr.set_source_rgba(*ram_rgb, 0.95)
+            cr.fill()
+            divider_x = 131
 
-        # separador central
-        cr.move_to(131, 10)
-        cr.line_to(131, 54)
+        cr.move_to(divider_x, 10)
+        cr.line_to(divider_x, 54)
         cr.set_source_rgba(1.0, 1.0, 1.0, 0.30)
         cr.set_line_width(2.0)
         cr.stroke()
@@ -694,11 +840,11 @@ def make_tray_icon(path, temp, color, ram_percent=None, ram_color=None, palette=
         temp_font = 43 if has_ram else 30
     else:
         temp_font = 30 if has_ram else 22
-    temp_cx = 33 if has_ram else 32
+    temp_cx = 36 if compact else (33 if has_ram else 32)
     draw_text(temp_text, temp_font, temp_rgb, temp_cx, 30 if has_ram else 28)
 
     # símbolo de grado
-    degree_x = 67 if has_ram else 53
+    degree_x = 68 if compact else (67 if has_ram else 53)
     degree_y = 13 if has_ram else 12
     degree_r = 4.5 if has_ram else 3.8
     cr.new_sub_path()
@@ -707,23 +853,28 @@ def make_tray_icon(path, temp, color, ram_percent=None, ram_color=None, palette=
     cr.set_line_width(1.8)
     cr.stroke()
 
-    # RAM (bloque derecho) con símbolo de porcentaje
+    # RAM y, opcionalmente, etiquetas GPU/RAM
     if has_ram:
-        draw_text("GPU", 19, label_rgb, 98, 31)
-
         ram_text = f"{ram_percent:.0f}"
         ram_font = 43 if len(ram_text) <= 2 else 30
-        draw_text(ram_text, ram_font, ram_rgb, 168, 30)
+        if compact:
+            draw_text(ram_text, ram_font, ram_rgb, 126, 30)
+            percent_cx, percent_cy = 160, 40
+        else:
+            draw_text("GPU", 19, label_rgb, 98, 31)
+            draw_text(ram_text, ram_font, ram_rgb, 168, 30)
+            percent_cx, percent_cy = 203, 40
 
         layout = PangoCairo.create_layout(cr)
         layout.set_font_description(Pango.FontDescription("Sans Bold 18"))
         layout.set_text("%", -1)
         percent_w, percent_h = layout.get_pixel_size()
-        cr.move_to(203 - percent_w / 2.0, 40 - percent_h / 2.0)
+        cr.move_to(percent_cx - percent_w / 2.0, percent_cy - percent_h / 2.0)
         cr.set_source_rgba(*ram_rgb, 0.95)
         PangoCairo.show_layout(cr, layout)
 
-        draw_text("RAM", 19, label_rgb, 246, 31)
+        if show_labels:
+            draw_text("RAM", 19, label_rgb, 246, 31)
 
     surface.write_to_png(path)
 
@@ -731,7 +882,7 @@ def make_tray_icon(path, temp, color, ram_percent=None, ram_color=None, palette=
 class MonitorApp:
     MAX_HISTORY = 120
 
-    def __init__(self, reader, use_tray=True):
+    def __init__(self, reader, use_tray=True, open_settings=False):
         import gi
         gi.require_version("Gtk", "3.0")
         from gi.repository import Gtk, GLib, Gdk
@@ -740,9 +891,16 @@ class MonitorApp:
         self.GLib = GLib
         self.reader = reader
         self.palette = load_theme_palette()
+        self.config = load_config()
         self.history = []
         self.ticks = 0
         self.indicator = None
+        self.last_data = None
+        self.active_palette = self.palette
+        self.settings_dialog = None
+        self._settings_widgets = None
+        self._settings_updating = False
+        self._timeout_id = None
 
         provider = Gtk.CssProvider()
         provider.load_from_data(CSS)
@@ -753,6 +911,7 @@ class MonitorApp:
         )
 
         self.win = Gtk.Window(title=f"{APP_NAME} — Intel UHD Graphics 630")
+        self.win.get_style_context().add_class("main-window")
         self.win.set_default_size(380, 392)
         self.win.set_resizable(False)
         self.win.set_border_width(16)
@@ -784,6 +943,19 @@ class MonitorApp:
         titles.pack_start(title, False, False, 0)
         titles.pack_start(subtitle, False, False, 0)
         header.pack_start(titles, True, True, 0)
+
+        settings_button = Gtk.Button()
+        settings_button.set_relief(Gtk.ReliefStyle.NONE)
+        settings_button.set_tooltip_text("Configuración")
+        settings_button.set_can_focus(False)
+        settings_button.get_style_context().add_class("gear-button")
+        settings_button.set_image(
+            Gtk.Image.new_from_icon_name(
+                "emblem-system-symbolic", Gtk.IconSize.BUTTON
+            )
+        )
+        settings_button.connect("clicked", lambda *_: self._open_settings())
+        header.pack_end(settings_button, False, False, 0)
         box.pack_start(header, False, False, 0)
 
         # Temperatura grande
@@ -843,7 +1015,9 @@ class MonitorApp:
 
         self.win.show_all()
         self._tick()
-        GLib.timeout_add(REFRESH_MS, self._tick)
+        self._reschedule_timer()
+        if open_settings:
+            GLib.idle_add(self._open_settings)
 
     # -- bandeja -----------------------------------------------------------
     def _setup_tray(self):
@@ -879,13 +1053,275 @@ class MonitorApp:
         menu = self.Gtk.Menu()
         show_item = self.Gtk.MenuItem(label="Mostrar monitor")
         show_item.connect("activate", lambda *_: self._show())
+        settings_item = self.Gtk.MenuItem(label="Configuración…")
+        settings_item.connect("activate", lambda *_: self._open_settings_from_tray())
         quit_item = self.Gtk.MenuItem(label="Salir")
         quit_item.connect("activate", lambda *_: self._quit())
         menu.append(show_item)
+        menu.append(settings_item)
         menu.append(self.Gtk.SeparatorMenuItem())
         menu.append(quit_item)
         menu.show_all()
         self.indicator.set_menu(menu)
+
+    # -- configuración -----------------------------------------------------
+    def _open_settings_from_tray(self):
+        self._show()
+        self._open_settings()
+
+    def _active_palette(self):
+        palette = dict(self.palette)
+        if not self.config.get("use_theme_colors", True):
+            palette.update(
+                {
+                    "accent": COLOR_OK,
+                    "accent_light": COLOR_RAM,
+                    "warning": COLOR_WARN,
+                    "error": COLOR_HOT,
+                }
+            )
+        return palette
+
+    def _reschedule_timer(self):
+        if self._timeout_id is not None:
+            try:
+                self.GLib.source_remove(self._timeout_id)
+            except Exception:
+                pass
+            self._timeout_id = None
+        interval = max(0.5, min(10.0, float(self.config["refresh_seconds"])))
+        self._timeout_id = self.GLib.timeout_add(
+            int(round(interval * 1000)), self._tick
+        )
+
+    def _rerender(self):
+        if self.last_data is not None:
+            self._render(self.last_data)
+
+    def _on_settings_destroyed(self, *_):
+        self.settings_dialog = None
+        self._settings_widgets = None
+
+    def _open_settings(self):
+        Gtk = self.Gtk
+        if self.settings_dialog is not None:
+            self.settings_dialog.present()
+            return
+
+        dialog = Gtk.Dialog()
+        dialog.set_title("Configuración — GPUMonitor")
+        dialog.set_transient_for(self.win)
+        dialog.set_modal(True)
+        dialog.set_resizable(False)
+        dialog.set_default_size(480, 610)
+        dialog.add_button("Restablecer valores", Gtk.ResponseType.APPLY)
+        dialog.add_button("Cerrar", Gtk.ResponseType.CLOSE)
+
+        content = dialog.get_content_area()
+        content.set_border_width(18)
+        content.set_spacing(8)
+
+        def section(text):
+            label = Gtk.Label(xalign=0)
+            label.set_markup(f"<b>{text}</b>")
+            label.set_margin_top(6)
+            return label
+
+        def row(text, control):
+            line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+            label = Gtk.Label(label=text, xalign=0)
+            label.set_hexpand(True)
+            line.pack_start(label, True, True, 0)
+            line.pack_end(control, False, False, 0)
+            return line
+
+        def spin(value, lower, upper, step, digits=0):
+            widget = Gtk.SpinButton.new_with_range(lower, upper, step)
+            widget.set_digits(digits)
+            widget.set_value(value)
+            widget.set_numeric(True)
+            widget.set_halign(Gtk.Align.END)
+            return widget
+
+        def switch(active):
+            widget = Gtk.Switch()
+            widget.set_active(active)
+            widget.set_halign(Gtk.Align.END)
+            return widget
+
+        cfg = self.config
+        interval = spin(cfg["refresh_seconds"], 0.5, 10.0, 0.5, 1)
+        temp_warn = spin(cfg["temp_warn"], 30, 100, 1)
+        temp_hot = spin(cfg["temp_hot"], 31, 110, 1)
+        ram_warn = spin(cfg["ram_warn"], 50, 100, 1)
+        ram_hot = spin(cfg["ram_hot"], 51, 100, 1)
+        theme_switch = switch(cfg["use_theme_colors"])
+        labels_switch = switch(cfg["show_labels"])
+        swap_switch = switch(cfg["show_swap"])
+        close_switch = switch(cfg["hide_on_close"])
+        autostart_switch = switch(autostart_enabled())
+
+        content.pack_start(section("Actualización"), False, False, 0)
+        content.pack_start(
+            row("Intervalo de refresco (segundos)", interval), False, False, 0
+        )
+        content.pack_start(Gtk.Separator(), False, False, 4)
+
+        content.pack_start(section("Umbrales"), False, False, 0)
+        content.pack_start(
+            row("Temperatura templada (°C)", temp_warn), False, False, 0
+        )
+        content.pack_start(
+            row("Temperatura crítica (°C)", temp_hot), False, False, 0
+        )
+        content.pack_start(row("RAM alta (%)", ram_warn), False, False, 0)
+        content.pack_start(row("RAM crítica (%)", ram_hot), False, False, 0)
+        content.pack_start(Gtk.Separator(), False, False, 4)
+
+        content.pack_start(section("Apariencia"), False, False, 0)
+        content.pack_start(
+            row("Usar colores del tema", theme_switch), False, False, 0
+        )
+        content.pack_start(
+            row("Mostrar etiquetas GPU / RAM", labels_switch), False, False, 0
+        )
+        content.pack_start(Gtk.Separator(), False, False, 4)
+
+        content.pack_start(section("Comportamiento"), False, False, 0)
+        content.pack_start(
+            row("Mostrar swap en el tooltip", swap_switch), False, False, 0
+        )
+        content.pack_start(
+            row("Cerrar la ventana la oculta en la bandeja", close_switch),
+            False,
+            False,
+            0,
+        )
+        content.pack_start(
+            row("Arrancar al iniciar sesión", autostart_switch), False, False, 0
+        )
+
+        config_display = CONFIG_PATH
+        home = os.path.expanduser("~")
+        if config_display.startswith(home + os.sep):
+            config_display = "~" + config_display[len(home):]
+        note = Gtk.Label(
+            label=(
+                "Los cambios se aplican al instante.\n"
+                f"Configuración: {config_display}"
+            ),
+            xalign=0,
+        )
+        note.set_line_wrap(True)
+        note.set_max_width_chars(52)
+        note.set_opacity(0.7)
+        note.set_margin_top(10)
+        content.pack_start(note, False, False, 0)
+
+        widgets = {
+            "interval": interval,
+            "temp_warn": temp_warn,
+            "temp_hot": temp_hot,
+            "ram_warn": ram_warn,
+            "ram_hot": ram_hot,
+            "theme": theme_switch,
+            "labels": labels_switch,
+            "swap": swap_switch,
+            "close": close_switch,
+            "autostart": autostart_switch,
+        }
+        self._settings_widgets = widgets
+
+        def changed(*_):
+            if self._settings_updating:
+                return
+            self._settings_updating = True
+            try:
+                warn = int(temp_warn.get_value())
+                hot = int(temp_hot.get_value())
+                if hot <= warn:
+                    hot = min(110, warn + 1)
+                    temp_hot.set_value(hot)
+                ram_low = int(ram_warn.get_value())
+                ram_high = int(ram_hot.get_value())
+                if ram_high <= ram_low:
+                    ram_high = min(100, ram_low + 1)
+                    ram_hot.set_value(ram_high)
+
+                new_cfg = dict(self.config)
+                new_cfg.update(
+                    {
+                        "refresh_seconds": round(float(interval.get_value()), 1),
+                        "temp_warn": warn,
+                        "temp_hot": hot,
+                        "ram_warn": ram_low,
+                        "ram_hot": ram_high,
+                        "use_theme_colors": theme_switch.get_active(),
+                        "show_labels": labels_switch.get_active(),
+                        "show_swap": swap_switch.get_active(),
+                        "hide_on_close": close_switch.get_active(),
+                    }
+                )
+                self.config = _normalize_config(new_cfg)
+                save_config(self.config)
+                self._reschedule_timer()
+                self._rerender()
+            finally:
+                self._settings_updating = False
+
+        def autostart_changed(*_):
+            if self._settings_updating:
+                return
+            want = autostart_switch.get_active()
+            try:
+                set_autostart(want)
+            except OSError as exc:
+                print(
+                    f"No se pudo cambiar el arranque automático: {exc}",
+                    file=sys.stderr,
+                )
+                self._settings_updating = True
+                autostart_switch.set_active(not want)
+                self._settings_updating = False
+
+        for widget in (interval, temp_warn, temp_hot, ram_warn, ram_hot):
+            widget.connect("value-changed", changed)
+        for widget in (theme_switch, labels_switch, swap_switch, close_switch):
+            widget.connect("notify::active", changed)
+        autostart_switch.connect("notify::active", autostart_changed)
+
+        def response(dlg, response_id):
+            if response_id == Gtk.ResponseType.APPLY:
+                self._reset_settings()
+            else:
+                dlg.destroy()
+
+        dialog.connect("response", response)
+        dialog.connect("destroy", self._on_settings_destroyed)
+        self.settings_dialog = dialog
+        dialog.show_all()
+        dialog.present()
+
+    def _reset_settings(self):
+        self.config = dict(DEFAULT_CONFIG)
+        save_config(self.config)
+        self._settings_updating = True
+        try:
+            widgets = self._settings_widgets or {}
+            if "interval" in widgets:
+                widgets["interval"].set_value(self.config["refresh_seconds"])
+                widgets["temp_warn"].set_value(self.config["temp_warn"])
+                widgets["temp_hot"].set_value(self.config["temp_hot"])
+                widgets["ram_warn"].set_value(self.config["ram_warn"])
+                widgets["ram_hot"].set_value(self.config["ram_hot"])
+                widgets["theme"].set_active(self.config["use_theme_colors"])
+                widgets["labels"].set_active(self.config["show_labels"])
+                widgets["swap"].set_active(self.config["show_swap"])
+                widgets["close"].set_active(self.config["hide_on_close"])
+        finally:
+            self._settings_updating = False
+        self._reschedule_timer()
+        self._rerender()
 
     # -- eventos -----------------------------------------------------------
     def _show(self):
@@ -896,7 +1332,7 @@ class MonitorApp:
         self.GLib.idle_add(self.Gtk.main_quit)
 
     def _on_delete(self, *_):
-        if self.indicator is not None:
+        if self.indicator is not None and self.config.get("hide_on_close", True):
             self.win.hide()
             return True
         self._quit()
@@ -913,13 +1349,22 @@ class MonitorApp:
         except Exception as exc:  # nunca tumbar la app por un sysfs raro
             self.footer.set_text(f"Error de lectura: {exc}")
             return True
+        self.last_data = data
+        if data["gpu_temp"] is not None:
+            self.history.append(data["gpu_temp"])
+            if len(self.history) > self.MAX_HISTORY:
+                del self.history[: len(self.history) - self.MAX_HISTORY]
         self._render(data)
         return True
 
     def _render(self, data):
         temp = data["gpu_temp"]
-        palette = self.palette
-        color, status_text = _color_for(temp, palette)
+        cfg = self.config
+        palette = self._active_palette()
+        self.active_palette = palette
+        color, status_text = _color_for(
+            temp, palette, cfg["temp_warn"], cfg["temp_hot"]
+        )
 
         big = f"{temp:.0f}" if temp is not None else "—"
         self.big.set_markup(
@@ -943,9 +1388,9 @@ class MonitorApp:
 
         if temp is None:
             bar_temp_color = palette["fg"]
-        elif temp >= 80.0:
+        elif temp >= cfg["temp_hot"]:
             bar_temp_color = palette["error"]
-        elif temp >= 60.0:
+        elif temp >= cfg["temp_warn"]:
             bar_temp_color = palette["warning"]
         else:
             bar_temp_color = palette["accent"]
@@ -953,37 +1398,41 @@ class MonitorApp:
         ram_pct = data.get("ram_percent")
         if ram_pct is None:
             bar_ram_color = palette["accent_light"]
-        elif ram_pct >= 90.0:
+        elif ram_pct >= cfg["ram_hot"]:
             bar_ram_color = palette["error"]
-        elif ram_pct >= 75.0:
+        elif ram_pct >= cfg["ram_warn"]:
             bar_ram_color = palette["warning"]
         else:
             bar_ram_color = palette["accent_light"]
 
         if ram_pct is None:
             self.detail_values["ram"].set_text("—")
+            self.detail_values["ram"].set_tooltip_text("")
         else:
             ram_text = (
                 f"{data['ram_used_gb']:.1f} / {data['ram_total_gb']:.1f} GB"
                 f" · {ram_pct:.0f} %"
             )
-            if ram_pct >= 90.0:
+            if ram_pct >= cfg["ram_hot"]:
                 ram_color = palette["error"]
-            elif ram_pct >= 75.0:
+            elif ram_pct >= cfg["ram_warn"]:
                 ram_color = palette["warning"]
             else:
                 ram_color = palette["accent_light"]
             self.detail_values["ram"].set_markup(
                 f'<span foreground="{ram_color}">{ram_text}</span>'
             )
-            swap_total = data.get("swap_total_gb") or 0.0
-            if swap_total > 0:
-                swap_tip = (
-                    f"Swap: {data['swap_used_gb']:.1f} / {swap_total:.1f} GB"
-                )
+            if cfg["show_swap"]:
+                swap_total = data.get("swap_total_gb") or 0.0
+                if swap_total > 0:
+                    swap_tip = (
+                        f"Swap: {data['swap_used_gb']:.1f} / {swap_total:.1f} GB"
+                    )
+                else:
+                    swap_tip = "Swap: no configurada"
+                self.detail_values["ram"].set_tooltip_text(swap_tip)
             else:
-                swap_tip = "Swap: no configurada"
-            self.detail_values["ram"].set_tooltip_text(swap_tip)
+                self.detail_values["ram"].set_tooltip_text("")
 
         if data["freq"] is not None:
             freq_text = f"{data['freq']:.0f}"
@@ -996,15 +1445,11 @@ class MonitorApp:
         self.detail_values["freq"].set_text(freq_text)
         self.detail_values["activity"].set_text(_fmt(data["activity"], " %", 0))
 
-        if temp is not None:
-            self.history.append(temp)
-            if len(self.history) > self.MAX_HISTORY:
-                del self.history[: len(self.history) - self.MAX_HISTORY]
         self.spark.queue_draw()
 
         stamp = time.strftime("%H:%M:%S")
         self.footer.set_text(
-            f"Actualizado {stamp} · cada {REFRESH_MS / 1000:.1f} s"
+            f"Actualizado {stamp} · cada {cfg['refresh_seconds']:.1f} s"
         )
 
         if self.indicator is not None:
@@ -1027,6 +1472,7 @@ class MonitorApp:
                     ram_percent=ram_pct,
                     ram_color=bar_ram_color,
                     palette=palette,
+                    show_labels=cfg["show_labels"],
                 )
                 self.indicator.set_icon_full(icon_file, tip)
             except Exception:
@@ -1060,7 +1506,13 @@ class MonitorApp:
             y = pad_y + usable_h * (1.0 - (value - low) / span)
             return x, y
 
-        color, _ = _color_for(data[-1], getattr(self, "palette", None))
+        cfg = self.config
+        color, _ = _color_for(
+            data[-1],
+            getattr(self, "active_palette", None),
+            cfg["temp_warn"],
+            cfg["temp_hot"],
+        )
         r, g, b = (
             int(color[1:3], 16) / 255.0,
             int(color[3:5], 16) / 255.0,
@@ -1092,7 +1544,7 @@ class MonitorApp:
         cr.fill()
 
 
-def run_gui(reader, use_tray):
+def run_gui(reader, use_tray, open_settings=False):
     try:
         import gi
         gi.require_version("Gtk", "3.0")
@@ -1112,7 +1564,7 @@ def run_gui(reader, use_tray):
         )
         return 1
 
-    MonitorApp(reader, use_tray=use_tray)
+    MonitorApp(reader, use_tray=use_tray, open_settings=open_settings)
     Gtk.main()
     return 0
 
@@ -1128,6 +1580,8 @@ def main(argv=None):
     parser.add_argument("--interval", type=float, default=REFRESH_MS / 1000.0,
                         help="segundos entre lecturas en modo CLI (por defecto 1.5)")
     parser.add_argument("--no-tray", action="store_true", help="no usar la bandeja del sistema")
+    parser.add_argument("--settings", action="store_true",
+                        help="abrir la ventana con la configuración")
     parser.add_argument("--version", action="version", version=f"{APP_NAME} {VERSION}")
     args = parser.parse_args(argv)
 
@@ -1137,7 +1591,9 @@ def main(argv=None):
         return run_json(reader)
     if args.cli:
         return run_cli(reader, max(0.2, args.interval), args.once)
-    return run_gui(reader, use_tray=not args.no_tray)
+    return run_gui(
+        reader, use_tray=not args.no_tray, open_settings=args.settings
+    )
 
 
 if __name__ == "__main__":

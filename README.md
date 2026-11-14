@@ -64,6 +64,8 @@ aplicación lo detecta automáticamente y deja de usar la aproximación.
 - **Colores tomados del tema activo** de Cinnamon/GTK: acento para la GPU,
   acento claro para la RAM, texto del panel para las etiquetas y colores de
   aviso/error para los estados altos.
+- **Configuración persistente**: intervalo, umbrales, etiquetas, colores,
+  swap, cierre a bandeja y arranque automático.
 - Frecuencia real de la GPU y frecuencia máxima (RP0).
 - Actividad de la GPU calculada con la residencia **RC6** del `i915`.
 - Uso de **memoria RAM y swap** desde `/proc/meminfo`.
@@ -90,7 +92,7 @@ Todo lo que se lee está en `sysfs` y es legible por tu usuario.
 ### Paquete .deb (recomendado)
 
 ```bash
-sudo apt install ./gpumonitor_1.0.1_all.deb
+sudo apt install ./gpumonitor_1.1.0_all.deb
 ```
 
 Instala la aplicación para todos los usuarios, con lanzador, icono y página de
@@ -100,8 +102,8 @@ repositorio.
 ### Desde el código (solo tu usuario)
 
 ```bash
-tar xzf gpumonitor-1.0.1.tar.gz
-cd gpumonitor-1.0.1
+tar xzf gpumonitor-1.1.0.tar.gz
+cd gpumonitor-1.1.0
 chmod +x install.sh gpumonitor.py
 ./install.sh
 ```
@@ -149,6 +151,7 @@ Desde el menú de aplicaciones: **GPUMonitor (UHD 630)**.
 
 ```bash
 gpumonitor                 # ventana + bandeja
+gpumonitor --settings      # ventana + configuración
 gpumonitor --no-tray       # solo ventana
 gpumonitor --cli           # terminal, refresco continuo
 gpumonitor --cli --once    # una lectura
@@ -165,6 +168,30 @@ Salida del modo CLI:
 El símbolo `≈` indica que la temperatura es la aproximación del paquete de CPU.
 Al cerrar la ventana con la bandeja activa, la app se oculta y sigue midiendo;
 usa **Salir** en el menú del icono para terminarla.
+
+## Configuración
+
+Abre la configuración con el **engranaje** de la ventana, desde el menú de la
+bandeja (**Configuración…**) o con:
+
+```bash
+gpumonitor --settings
+```
+
+![Configuración de GPUMonitor](docs/settings.png)
+
+Opciones disponibles:
+
+- **Intervalo de refresco**: de 0,5 a 10 segundos.
+- **Umbrales**: temperatura templada/crítica y RAM alta/crítica.
+- **Apariencia**: usar colores del tema y mostrar etiquetas GPU/RAM (si se
+  desactivan, el icono se compacta a `39° | 37%`).
+- **Comportamiento**: mostrar swap en el tooltip, cerrar la ventana la oculta
+  en la bandeja y arrancar al iniciar sesión.
+
+Los cambios se aplican al instante y se guardan en
+`~/.config/gpumonitor/config.json`. El arranque automático crea o elimina
+`~/.config/autostart/gpumonitor.desktop`.
 
 ## Tamaño en el panel
 
@@ -245,7 +272,8 @@ gpumonitor/
 ├── README.md
 ├── docs/
 │   ├── screenshot.png
-│   └── panel.png
+│   ├── panel.png
+│   └── settings.png
 ├── packaging/
 │   ├── build-deb.sh       # genera .deb + tar.gz en dist/
 │   ├── copyright
@@ -267,8 +295,8 @@ Repositorio: https://github.com/shary-hh/gpumonitor
 Para publicar una nueva release:
 
 ```bash
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
 El workflow `.github/workflows/release.yml` construye el `.deb`, el tarball y

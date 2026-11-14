@@ -4,7 +4,7 @@
 #   ./packaging/build-deb.sh
 #
 # Variables opcionales:
-#   VERSION=1.0.1
+#   VERSION=1.1.0
 #   MAINTAINER="Nombre <correo>"
 #   HOMEPAGE="https://github.com/usuario/gpumonitor"
 set -euo pipefail
@@ -12,7 +12,7 @@ umask 022
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PKG="gpumonitor"
-VERSION="${VERSION:-1.0.1}"
+VERSION="${VERSION:-1.1.0}"
 ARCH="all"
 MAINTAINER="${MAINTAINER:-shary-hh <193357000+shary-hh@users.noreply.github.com>}"
 HOMEPAGE="${HOMEPAGE:-https://github.com/shary-hh/gpumonitor}"
@@ -36,6 +36,7 @@ install -m 644 "$ROOT/README.md" "$BUILD/usr/share/doc/$PKG/README.md"
 install -m 644 "$ROOT/packaging/copyright" "$BUILD/usr/share/doc/$PKG/copyright"
 install -m 644 "$ROOT/docs/screenshot.png" "$BUILD/usr/share/doc/$PKG/docs/screenshot.png"
 install -m 644 "$ROOT/docs/panel.png" "$BUILD/usr/share/doc/$PKG/docs/panel.png"
+install -m 644 "$ROOT/docs/settings.png" "$BUILD/usr/share/doc/$PKG/docs/settings.png"
 
 cat > "$BUILD/usr/bin/gpumonitor" <<'EOF'
 #!/bin/sh

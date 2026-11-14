@@ -6,6 +6,7 @@ gpumonitor \- temperatura y RAM de la iGPU Intel UHD Graphics 630 en Cinnamon
 [\fB\-\-cli\fR [\fB\-\-once\fR] [\fB\-\-interval\fR \fISEGUNDOS\fR]]
 [\fB\-\-json\fR]
 [\fB\-\-no\-tray\fR]
+[\fB\-\-settings\fR]
 .SH DESCRIPTION
 .B gpumonitor
 muestra en una ventana GTK3 y en la bandeja de Cinnamon la temperatura de la
@@ -18,7 +19,9 @@ con el símbolo «≈» en el modo CLI y con el texto «Aproximación» en la
 ventana. Si el kernel expone un sensor real, se usa automáticamente.
 .PP
 Los colores del icono se obtienen del tema activo de Cinnamon/GTK y se
-actualizan cada 30 segundos.
+actualizan cada 30 segundos. La configuración (intervalo, umbrales, etiquetas,
+colores, swap, cierre a bandeja y arranque automático) se guarda en
+.IR ~/.config/gpumonitor/config.json .
 .SH OPTIONS
 .TP
 .B \-\-cli
@@ -36,17 +39,24 @@ Intervalo entre lecturas en modo CLI (por defecto 1.5).
 .B \-\-no\-tray
 No crea el icono de la bandeja; solo muestra la ventana.
 .TP
+.B \-\-settings
+Abre la ventana principal con el diálogo de configuración.
+.TP
 .B \-\-version
 Muestra la versión y sale.
 .SH EXAMPLES
 .PP
 .nf
 gpumonitor
+gpumonitor --settings
 gpumonitor --cli --once
 gpumonitor --json | jq
 gpumonitor --no-tray
 .fi
 .SH FILES
+.TP
+.I ~/.config/gpumonitor/config.json
+Configuración persistente (intervalo, umbrales, apariencia y comportamiento).
 .TP
 .I ~/.local/share/gpumonitor/
 Instalación por usuario creada por \fBinstall.sh\fR.
