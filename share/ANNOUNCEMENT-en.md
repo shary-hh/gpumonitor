@@ -45,7 +45,7 @@ sensor, the app detects and uses it automatically.
 ### .deb package (recommended)
 
 ```bash
-sudo apt install ./gpumonitor_1.0.0_all.deb
+sudo apt install ./gpumonitor_1.0.1_all.deb
 ```
 
 Dependencies: `python3-gi`, `gir1.2-gtk-3.0`, `python3-cairo` and
@@ -54,8 +54,8 @@ Dependencies: `python3-gi`, `gir1.2-gtk-3.0`, `python3-cairo` and
 ### From source, current user only
 
 ```bash
-tar xzf gpumonitor-1.0.0.tar.gz
-cd gpumonitor-1.0.0
+tar xzf gpumonitor-1.0.1.tar.gz
+cd gpumonitor-1.0.1
 ./install.sh                # launcher and `gpumonitor` command
 ./install.sh --autostart    # also start at login
 ./install.sh --uninstall    # uninstall

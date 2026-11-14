@@ -4,7 +4,7 @@
 #   ./packaging/build-deb.sh
 #
 # Variables opcionales:
-#   VERSION=1.0.0
+#   VERSION=1.0.1
 #   MAINTAINER="Nombre <correo>"
 #   HOMEPAGE="https://github.com/usuario/gpumonitor"
 set -euo pipefail
@@ -12,7 +12,7 @@ umask 022
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PKG="gpumonitor"
-VERSION="${VERSION:-1.0.0}"
+VERSION="${VERSION:-1.0.1}"
 ARCH="all"
 MAINTAINER="${MAINTAINER:-shary-hh <193357000+shary-hh@users.noreply.github.com>}"
 HOMEPAGE="${HOMEPAGE:-https://github.com/shary-hh/gpumonitor}"

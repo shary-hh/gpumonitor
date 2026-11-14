@@ -90,7 +90,7 @@ Todo lo que se lee está en `sysfs` y es legible por tu usuario.
 ### Paquete .deb (recomendado)
 
 ```bash
-sudo apt install ./gpumonitor_1.0.0_all.deb
+sudo apt install ./gpumonitor_1.0.1_all.deb
 ```
 
 Instala la aplicación para todos los usuarios, con lanzador, icono y página de
@@ -100,8 +100,8 @@ repositorio.
 ### Desde el código (solo tu usuario)
 
 ```bash
-tar xzf gpumonitor-1.0.0.tar.gz
-cd gpumonitor-1.0.0
+tar xzf gpumonitor-1.0.1.tar.gz
+cd gpumonitor-1.0.1
 chmod +x install.sh gpumonitor.py
 ./install.sh
 ```
@@ -267,8 +267,8 @@ Repositorio: https://github.com/shary-hh/gpumonitor
 Para publicar una nueva release:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
 El workflow `.github/workflows/release.yml` construye el `.deb`, el tarball y

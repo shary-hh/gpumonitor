@@ -42,7 +42,7 @@ la app lo detecta y lo usa automáticamente.
 ### Paquete .deb (recomendado)
 
 ```bash
-sudo apt install ./gpumonitor_1.0.0_all.deb
+sudo apt install ./gpumonitor_1.0.1_all.deb
 ```
 
 Dependencias: `python3-gi`, `gir1.2-gtk-3.0`, `python3-cairo` y
@@ -51,8 +51,8 @@ Dependencias: `python3-gi`, `gir1.2-gtk-3.0`, `python3-cairo` y
 ### Desde el código, solo para tu usuario
 
 ```bash
-tar xzf gpumonitor-1.0.0.tar.gz
-cd gpumonitor-1.0.0
+tar xzf gpumonitor-1.0.1.tar.gz
+cd gpumonitor-1.0.1
 ./install.sh                # lanzador y comando gpumonitor
 ./install.sh --autostart    # además arranca al iniciar sesión
 ./install.sh --uninstall    # desinstalar

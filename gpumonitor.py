@@ -43,7 +43,7 @@ import time
 
 APP_NAME = "GPUMonitor"
 APP_ID = "gpumonitor"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 REFRESH_MS = 1500
 
 
@@ -640,7 +640,7 @@ def make_tray_icon(path, temp, color, ram_percent=None, ram_color=None, palette=
     fg_rgb = _rgb(palette["fg"])
     label_rgb = fg_rgb
     has_ram = ram_percent is not None
-    width = 268 if has_ram else 64
+    width = 288 if has_ram else 64
     height = 64
 
     surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
@@ -673,7 +673,7 @@ def make_tray_icon(path, temp, color, ram_percent=None, ram_color=None, palette=
         _rounded_rect(cr, 8, height - 5, 118, 2.5, 1.25)
         cr.set_source_rgba(*temp_rgb, 0.95)
         cr.fill()
-        _rounded_rect(cr, 140, height - 5, 116, 2.5, 1.25)
+        _rounded_rect(cr, 142, height - 5, 130, 2.5, 1.25)
         cr.set_source_rgba(*ram_rgb, 0.95)
         cr.fill()
 
@@ -719,11 +719,11 @@ def make_tray_icon(path, temp, color, ram_percent=None, ram_color=None, palette=
         layout.set_font_description(Pango.FontDescription("Sans Bold 18"))
         layout.set_text("%", -1)
         percent_w, percent_h = layout.get_pixel_size()
-        cr.move_to(203 - percent_w / 2.0, 13 - percent_h / 2.0)
+        cr.move_to(203 - percent_w / 2.0, 40 - percent_h / 2.0)
         cr.set_source_rgba(*ram_rgb, 0.95)
         PangoCairo.show_layout(cr, layout)
 
-        draw_text("RAM", 19, label_rgb, 232, 31)
+        draw_text("RAM", 19, label_rgb, 246, 31)
 
     surface.write_to_png(path)
 
