@@ -1,0 +1,24 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir .deb y tarball
+        run: ./packaging/build-deb.sh
+      - name: Publicar artefactos
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpumonitor
+          path: |
+            dist/*.deb
+            dist/*.tar.gz
+            dist/SHA256SUMS

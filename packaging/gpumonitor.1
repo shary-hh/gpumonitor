@@ -1,0 +1,60 @@
+.TH GPUMONITOR 1 "@DATE@" "GPUMonitor @VERSION@" "User Commands"
+.SH NAME
+gpumonitor \- temperatura y RAM de la iGPU Intel UHD Graphics 630 en Cinnamon
+.SH SYNOPSIS
+.B gpumonitor
+[\fB\-\-cli\fR [\fB\-\-once\fR] [\fB\-\-interval\fR \fISEGUNDOS\fR]]
+[\fB\-\-json\fR]
+[\fB\-\-no\-tray\fR]
+.SH DESCRIPTION
+.B gpumonitor
+muestra en una ventana GTK3 y en la bandeja de Cinnamon la temperatura de la
+iGPU Intel UHD Graphics 630, su frecuencia, su actividad y el uso de memoria
+RAM. También incluye un modo de texto y salida JSON para scripts.
+.PP
+En Linux la UHD 630 no expone un sensor térmico propio. La aplicación usa como
+aproximación la temperatura del paquete de la CPU (misma oblea) y lo indica
+con el símbolo «≈» en el modo CLI y con el texto «Aproximación» en la
+ventana. Si el kernel expone un sensor real, se usa automáticamente.
+.PP
+Los colores del icono se obtienen del tema activo de Cinnamon/GTK y se
+actualizan cada 30 segundos.
+.SH OPTIONS
+.TP
+.B \-\-cli
+Muestra las lecturas en la terminal y se refresca continuamente.
+.TP
+.B \-\-once
+Con \fB\-\-cli\fR, imprime una sola lectura y sale.
+.TP
+.B \-\-json
+Imprime una muestra en JSON y sale.
+.TP
+.BI \-\-interval " SEGUNDOS"
+Intervalo entre lecturas en modo CLI (por defecto 1.5).
+.TP
+.B \-\-no\-tray
+No crea el icono de la bandeja; solo muestra la ventana.
+.TP
+.B \-\-version
+Muestra la versión y sale.
+.SH EXAMPLES
+.PP
+.nf
+gpumonitor
+gpumonitor --cli --once
+gpumonitor --json | jq
+gpumonitor --no-tray
+.fi
+.SH FILES
+.TP
+.I ~/.local/share/gpumonitor/
+Instalación por usuario creada por \fBinstall.sh\fR.
+.TP
+.I ~/.config/autostart/gpumonitor.desktop
+Arranque automático opcional.
+.SH SEE ALSO
+.BR sensors (1),
+.BR intel_gpu_top (1)
+.SH AUTHOR
+shary-hh. Licencia MIT.
