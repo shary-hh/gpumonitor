@@ -1,3 +1,4 @@
+# Crea una release de GitHub al subir un tag v* (por ejemplo v1.0.0).
 name: release
 
 on:
